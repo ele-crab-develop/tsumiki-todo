@@ -93,203 +93,13 @@ body {
   display: flex;
   flex: 1;
   overflow: hidden;
-  gap: 0;
 }
 
-/* ===== Canvas ===== */
-.canvas-container {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-  background: radial-gradient(ellipse at center bottom, #16213e 0%, #1a1a2e 70%);
-  cursor: grab;
-  user-select: none;
-  position: relative;
-}
-
-.canvas-container:active {
-  cursor: grabbing;
-}
-
-.canvas-world {
-  position: relative;
-  transform-origin: center center;
-  /* Scale to fit viewport while preserving aspect ratio */
-}
-
-/* ===== Staging Area ===== */
-.staging-area {
-  position: absolute;
-  left: 0;
-  right: 0;
-  background: rgba(255, 255, 255, 0.02);
-  border-bottom: none;
-  z-index: 0;
-}
-
-.staging-label {
-  position: absolute;
-  left: 12px;
-  top: 8px;
-  font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.2);
-  font-weight: 600;
-  letter-spacing: 0.1em;
-}
-
-.shelf-line {
-  position: absolute;
-  left: 20px;
-  right: 20px;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.08);
-  z-index: 1;
-}
-
-/* ===== Limit Line ===== */
-.limit-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--accent) 0,
-    var(--accent) 8px,
-    transparent 8px,
-    transparent 16px
-  );
-  opacity: 0.6;
-  z-index: 1;
-}
-
-.limit-label {
-  position: absolute;
-  right: 8px;
-  top: -20px;
-  font-size: 0.7rem;
-  color: var(--accent);
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-/* ===== Hour Markers ===== */
-.hour-marker {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.hour-label {
-  position: absolute;
-  left: 6px;
-  top: -12px;
-  font-size: 0.6rem;
-  color: rgba(255, 255, 255, 0.15);
-  font-weight: 500;
-}
-
-/* ===== Ground ===== */
-.ground {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 30px;
-  background: linear-gradient(180deg, #2d3561 0%, #1a1a2e 100%);
-  border-top: 2px solid rgba(255, 255, 255, 0.1);
-}
-
-/* ===== Task Blocks ===== */
-.block {
-  position: absolute;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  transition: box-shadow 0.2s;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  z-index: 10;
-}
-
-.block:active {
-  cursor: grabbing;
-}
-
-.block.completed {
-  cursor: default;
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.15) 75%, transparent 75%);
-  background-size: 20px 20px;
-}
-
-.block.long-pressing {
-  animation: shake 0.1s ease-in-out infinite alternate;
-}
-
-@keyframes shake {
-  from { transform: translateX(-1px); }
-  to { transform: translateX(1px); }
-}
-
-.long-press-overlay {
-  position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.block-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0 12px;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.block-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.75);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-
-.block-hours {
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: rgba(0, 0, 0, 0.5);
-  margin-left: 4px;
-  flex-shrink: 0;
-}
-
-.check-mark {
-  position: absolute;
-  right: 6px;
-  top: 2px;
-  font-size: 0.9rem;
-  color: rgba(0, 0, 0, 0.5);
-  pointer-events: none;
-  z-index: 2;
-}
-
-/* ===== Side Controls ===== */
+/* ===== Side Controls (left) ===== */
 .side-controls {
-  width: 240px;
+  width: 220px;
   background: var(--bg-light);
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
   padding: 16px;
@@ -383,7 +193,6 @@ body {
   color: var(--accent);
 }
 
-/* ===== Instructions ===== */
 .instructions {
   padding: 12px;
   border-radius: var(--radius);
@@ -395,6 +204,202 @@ body {
   font-size: 0.72rem;
   color: var(--text-muted);
   line-height: 1.8;
+}
+
+/* ===== Canvas ===== */
+.canvas-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  background: var(--bg);
+  cursor: grab;
+  user-select: none;
+  position: relative;
+}
+
+.canvas-container:active {
+  cursor: grabbing;
+}
+
+.canvas-world {
+  position: relative;
+  height: 100%;
+  max-width: 100%;
+  /* aspect-ratio is set inline; this makes the world fill available height and scale width accordingly */
+}
+
+/* ===== Staging Zones (left/right) ===== */
+.staging-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.015);
+  z-index: 0;
+}
+
+.staging-left {
+  left: 0;
+}
+
+.staging-right {
+  /* left and width set inline */
+}
+
+.staging-label {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.15);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+/* ===== Stacking Dividers ===== */
+.stacking-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  z-index: 1;
+}
+
+/* ===== Limit Line ===== */
+.limit-line {
+  position: absolute;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--accent) 0,
+    var(--accent) 8px,
+    transparent 8px,
+    transparent 16px
+  );
+  opacity: 0.6;
+  z-index: 1;
+}
+
+.limit-label {
+  position: absolute;
+  right: 4px;
+  top: -18px;
+  font-size: 0.65rem;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* ===== Hour Markers ===== */
+.hour-marker {
+  position: absolute;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.hour-label {
+  position: absolute;
+  left: 4px;
+  top: -11px;
+  font-size: 0.55rem;
+  color: rgba(255, 255, 255, 0.12);
+  font-weight: 500;
+}
+
+/* ===== Ground ===== */
+.ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4%;
+  background: linear-gradient(180deg, #2d3561 0%, #1a1a2e 100%);
+  border-top: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ===== Task Blocks ===== */
+.block {
+  position: absolute;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  transition: box-shadow 0.2s;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  z-index: 10;
+}
+
+.block:active {
+  cursor: grabbing;
+}
+
+.block.completed {
+  cursor: default;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.15) 75%, transparent 75%);
+  background-size: 20px 20px;
+}
+
+.block.long-pressing {
+  animation: shake 0.1s ease-in-out infinite alternate;
+}
+
+@keyframes shake {
+  from { transform: translateX(-1px); }
+  to { transform: translateX(1px); }
+}
+
+.long-press-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.block-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 10px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.block-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.75);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.block-hours {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.5);
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.check-mark {
+  position: absolute;
+  right: 5px;
+  top: 2px;
+  font-size: 0.8rem;
+  color: rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 2;
 }
 
 /* ===== Panel Overlay ===== */
@@ -545,7 +550,7 @@ body {
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .main-area {
-    flex-direction: column;
+    flex-direction: column-reverse;
   }
 
   .side-controls {
@@ -554,9 +559,9 @@ body {
     flex-wrap: wrap;
     padding: 12px;
     gap: 8px;
-    border-left: none;
+    border-right: none;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
-    max-height: 180px;
+    max-height: 160px;
     overflow-y: auto;
   }
 

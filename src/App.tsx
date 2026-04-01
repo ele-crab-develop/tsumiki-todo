@@ -9,8 +9,8 @@ import {
   BLOCK_WIDTH,
   LIMIT_LINE_Y,
   GROUND_Y,
-  STAGING_SHELF_Y,
-  STAGING_SPAWN_Y,
+  STACKING_LEFT,
+  STACKING_RIGHT,
   hoursToHeight,
   stagingX,
   MAX_HOURS,
@@ -28,11 +28,10 @@ function App() {
   const [showPanel, setShowPanel] = useState(false);
 
   const physics = usePhysics();
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const worldRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<number | null>(null);
   const longPressStart = useRef<number>(0);
   const longPressRaf = useRef<number>(0);
-  const isDragging = useRef(false);
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
 
@@ -45,7 +44,7 @@ function App() {
     }
   }, []);
 
-  // Sync physics positions to React at 60fps
+  // Sync physics → React at 60fps
   useEffect(() => {
     let raf: number;
     const sync = () => {
@@ -56,44 +55,32 @@ function App() {
     return () => cancelAnimationFrame(raf);
   }, [physics]);
 
-  // Save current positions to localStorage
-  const saveCurrentState = useCallback(() => {
-    const currentTasks = tasksRef.current;
-    if (currentTasks.length === 0) return;
-    const pos = physics.getBodyPositions();
-    taskStore.syncPositions(pos);
-  }, [physics]);
-
-  // Auto-save when tasks change
+  // Auto-save positions periodically
   useEffect(() => {
-    if (tasks.length === 0) return;
-    const timeout = setTimeout(saveCurrentState, 500);
-    return () => clearTimeout(timeout);
-  }, [tasks, saveCurrentState]);
+    const interval = setInterval(() => {
+      if (tasksRef.current.length > 0) {
+        taskStore.syncPositions(physics.getBodyPositions());
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [physics]);
 
   const totalHours = tasks.reduce((sum, t) => sum + t.hours, 0);
 
+  // ---- CRUD ----
   const addTask = useCallback(
     (title: string, hours: number) => {
-      // Count how many unplaced (non-completed, above shelf) blocks exist for positioning
-      const pos = physics.getBodyPositions();
-      const stagedCount = tasksRef.current.filter((t) => {
-        if (t.completed) return false;
-        const p = pos.get(t.id);
-        return p && p.y < LIMIT_LINE_Y;
-      }).length;
-
       const task: Task = {
         id: crypto.randomUUID(),
         title,
         hours,
         color: randomColor(),
         completed: false,
-        x: stagingX(stagedCount),
-        y: STAGING_SPAWN_Y - hoursToHeight(hours) / 2,
+        x: stagingX(tasksRef.current.length),
+        y: GROUND_Y - hoursToHeight(hours) / 2 - 4,
       };
-      physics.addBlock(task);
       taskStore.add(task);
+      physics.addBlock(task);
       setTasks((prev) => [...prev, task]);
     },
     [physics]
@@ -104,18 +91,11 @@ function App() {
       setTasks((prev) => {
         const existing = prev.find((t) => t.id === id);
         if (!existing) return prev;
-
         const pos = physics.getBodyPositions().get(id);
         physics.removeBlock(id);
-        const updated: Task = {
-          ...existing,
-          title,
-          hours,
-          x: pos?.x ?? existing.x,
-          y: pos?.y ?? existing.y,
-        };
-        physics.addBlock(updated);
+        const updated: Task = { ...existing, title, hours, x: pos?.x ?? existing.x, y: pos?.y ?? existing.y };
         taskStore.update(id, { title, hours, x: updated.x, y: updated.y });
+        physics.addBlock(updated);
         return prev.map((t) => (t.id === id ? updated : t));
       });
     },
@@ -135,9 +115,7 @@ function App() {
     (id: string) => {
       physics.setStatic(id, true);
       taskStore.update(id, { completed: true });
-      setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, completed: true } : t))
-      );
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: true } : t)));
     },
     [physics]
   );
@@ -146,21 +124,19 @@ function App() {
     (id: string) => {
       physics.setStatic(id, false);
       taskStore.update(id, { completed: false });
-      setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, completed: false } : t))
-      );
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: false } : t)));
     },
     [physics]
   );
 
-  // Pointer handlers
-  const getCanvasPos = (e: React.PointerEvent | React.MouseEvent) => {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const scaleX = WORLD_WIDTH / rect.width;
-    const scaleY = WORLD_HEIGHT / rect.height;
+  // ---- Coordinate mapping ----
+  // Uses worldRef (the actual world div), not the container.
+  // getBoundingClientRect returns screen-space rect, so this handles any CSS scaling.
+  const toWorldCoords = (e: React.PointerEvent | React.MouseEvent) => {
+    const rect = worldRef.current!.getBoundingClientRect();
     return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
+      x: ((e.clientX - rect.left) / rect.width) * WORLD_WIDTH,
+      y: ((e.clientY - rect.top) / rect.height) * WORLD_HEIGHT,
     };
   };
 
@@ -170,6 +146,7 @@ function App() {
     return tasksRef.current.find((t) => t.id === hitId);
   };
 
+  // ---- Long-press ----
   const cancelLongPress = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
@@ -181,66 +158,53 @@ function App() {
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    const { x, y } = getCanvasPos(e);
-    isDragging.current = false;
-
+    const { x, y } = toWorldCoords(e);
     const task = findTaskAtPoint(x, y);
 
     if (task) {
       longPressStart.current = Date.now();
       setLongPressId(task.id);
-
-      const animateProgress = () => {
-        const elapsed = Date.now() - longPressStart.current;
-        const progress = Math.min(elapsed / 800, 1);
+      const animate = () => {
+        const progress = Math.min((Date.now() - longPressStart.current) / 800, 1);
         setLongPressProgress(progress);
-        if (progress < 1) {
-          longPressRaf.current = requestAnimationFrame(animateProgress);
-        }
+        if (progress < 1) longPressRaf.current = requestAnimationFrame(animate);
       };
-      longPressRaf.current = requestAnimationFrame(animateProgress);
+      longPressRaf.current = requestAnimationFrame(animate);
 
       longPressTimer.current = window.setTimeout(() => {
-        if (task.completed) {
-          uncompleteTask(task.id);
-        } else {
-          completeTask(task.id);
-        }
+        task.completed ? uncompleteTask(task.id) : completeTask(task.id);
         cancelLongPress();
       }, 800);
     }
 
-    if (!task?.completed) {
-      physics.mouseDown(x, y);
-    }
+    if (!task?.completed) physics.mouseDown(x, y);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    const { x, y } = getCanvasPos(e);
-    isDragging.current = true;
+    const { x, y } = toWorldCoords(e);
     cancelLongPress();
     physics.mouseMove(x, y);
   };
 
   const handlePointerUp = () => {
     cancelLongPress();
-    const wasDragging = isDragging.current;
     physics.mouseUp();
-    isDragging.current = false;
-    // Save positions after drag ends
-    if (wasDragging) {
-      setTimeout(saveCurrentState, 100);
-    }
+    // Save positions after drag
+    setTimeout(() => taskStore.syncPositions(physics.getBodyPositions()), 100);
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
-    const { x, y } = getCanvasPos(e);
+    const { x, y } = toWorldCoords(e);
     const task = findTaskAtPoint(x, y);
     if (task && !task.completed) {
       setEditingTask(task);
       setShowPanel(true);
     }
   };
+
+  // ---- Percentage helpers for responsive rendering ----
+  const px = (v: number) => `${(v / WORLD_WIDTH) * 100}%`;
+  const py = (v: number) => `${(v / WORLD_HEIGHT) * 100}%`;
 
   return (
     <div className="app">
@@ -257,9 +221,31 @@ function App() {
       </header>
 
       <div className="main-area">
+        <div className="side-controls">
+          <button className="add-btn" onClick={() => { setEditingTask(null); setShowPanel(true); }}>
+            + タスク追加
+          </button>
+          <div className="task-list">
+            {tasks.map((t) => (
+              <div key={t.id} className={`task-item ${t.completed ? 'completed' : ''}`}>
+                <span className="task-color-dot" style={{ background: t.completed ? GOLD_COLOR : t.color }} />
+                <span className="task-name">{t.title}</span>
+                <span className="task-hrs">{t.hours}h</span>
+                {!t.completed && (
+                  <button className="task-delete" onClick={() => deleteTask(t.id)}>×</button>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="instructions">
+            <p>ドラッグで積み木を移動</p>
+            <p>長押しで完了/未完了を切替</p>
+            <p>ダブルクリックで編集</p>
+          </div>
+        </div>
+
         <div
           className="canvas-container"
-          ref={canvasRef}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -267,29 +253,49 @@ function App() {
           onDoubleClick={handleDoubleClick}
           style={{ touchAction: 'none' }}
         >
-          <div className="canvas-world" style={{ width: WORLD_WIDTH, height: WORLD_HEIGHT }}>
-            {/* Staging area label */}
-            <div className="staging-area" style={{ top: 0, height: STAGING_SHELF_Y }}>
+          <div ref={worldRef} className="canvas-world" style={{ aspectRatio: `${WORLD_WIDTH}/${WORLD_HEIGHT}` }}>
+            {/* Left staging zone */}
+            <div className="staging-zone staging-left" style={{ width: px(STACKING_LEFT) }}>
+              <span className="staging-label">タスク置き場</span>
+            </div>
+            {/* Right staging zone */}
+            <div className="staging-zone staging-right" style={{ width: px(WORLD_WIDTH - STACKING_RIGHT), left: px(STACKING_RIGHT) }}>
               <span className="staging-label">タスク置き場</span>
             </div>
 
-            {/* Staging shelf line */}
-            <div className="shelf-line" style={{ top: STAGING_SHELF_Y }} />
+            {/* Stacking area dividers */}
+            <div className="stacking-divider" style={{ left: px(STACKING_LEFT) }} />
+            <div className="stacking-divider" style={{ left: px(STACKING_RIGHT) }} />
 
-            {/* Limit line */}
-            <div className="limit-line" style={{ top: LIMIT_LINE_Y }}>
+            {/* Limit line (only in stacking area) */}
+            <div
+              className="limit-line"
+              style={{
+                top: py(LIMIT_LINE_Y),
+                left: px(STACKING_LEFT),
+                width: px(STACKING_RIGHT - STACKING_LEFT),
+              }}
+            >
               <span className="limit-label">{MAX_HOURS}h limit</span>
             </div>
 
             {/* Hour markers */}
             {Array.from({ length: MAX_HOURS + 1 }, (_, i) => (
-              <div key={i} className="hour-marker" style={{ top: GROUND_Y - i * PX_PER_HOUR }}>
+              <div
+                key={i}
+                className="hour-marker"
+                style={{
+                  top: py(GROUND_Y - i * PX_PER_HOUR),
+                  left: px(STACKING_LEFT),
+                  width: px(STACKING_RIGHT - STACKING_LEFT),
+                }}
+              >
                 {i > 0 && i % 2 === 0 && <span className="hour-label">{i}h</span>}
               </div>
             ))}
 
             {/* Ground */}
-            <div className="ground" style={{ top: GROUND_Y }} />
+            <div className="ground" style={{ top: py(GROUND_Y) }} />
 
             {/* Task blocks */}
             {tasks.map((task) => {
@@ -297,17 +303,15 @@ function App() {
               if (!pos) return null;
               const h = hoursToHeight(task.hours);
               const isLongPressing = longPressId === task.id;
-
               return (
                 <div
                   key={task.id}
                   className={`block ${task.completed ? 'completed' : ''} ${isLongPressing ? 'long-pressing' : ''}`}
                   style={{
-                    width: BLOCK_WIDTH,
-                    height: h,
-                    left: pos.x - BLOCK_WIDTH / 2,
-                    top: pos.y - h / 2,
-                    transform: 'none',
+                    width: px(BLOCK_WIDTH),
+                    height: py(h),
+                    left: px(pos.x - BLOCK_WIDTH / 2),
+                    top: py(pos.y - h / 2),
                     backgroundColor: task.completed ? GOLD_COLOR : task.color,
                   }}
                 >
@@ -331,66 +335,19 @@ function App() {
             })}
           </div>
         </div>
-
-        <div className="side-controls">
-          <button
-            className="add-btn"
-            onClick={() => {
-              setEditingTask(null);
-              setShowPanel(true);
-            }}
-          >
-            + タスク追加
-          </button>
-
-          <div className="task-list">
-            {tasks.map((t) => (
-              <div key={t.id} className={`task-item ${t.completed ? 'completed' : ''}`}>
-                <span className="task-color-dot" style={{ background: t.completed ? GOLD_COLOR : t.color }} />
-                <span className="task-name">{t.title}</span>
-                <span className="task-hrs">{t.hours}h</span>
-                {!t.completed && (
-                  <button className="task-delete" onClick={() => deleteTask(t.id)}>
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="instructions">
-            <p>🖱 ドラッグで積み木を移動</p>
-            <p>👆 長押しで完了/未完了を切替</p>
-            <p>🖱 ダブルクリックで編集</p>
-          </div>
-        </div>
       </div>
 
       {showPanel && (
         <TaskPanel
           task={editingTask}
           onSave={(title, hours) => {
-            if (editingTask) {
-              updateTask(editingTask.id, title, hours);
-            } else {
-              addTask(title, hours);
-            }
+            if (editingTask) updateTask(editingTask.id, title, hours);
+            else addTask(title, hours);
             setShowPanel(false);
             setEditingTask(null);
           }}
-          onDelete={
-            editingTask
-              ? () => {
-                  deleteTask(editingTask.id);
-                  setShowPanel(false);
-                  setEditingTask(null);
-                }
-              : undefined
-          }
-          onClose={() => {
-            setShowPanel(false);
-            setEditingTask(null);
-          }}
+          onDelete={editingTask ? () => { deleteTask(editingTask.id); setShowPanel(false); setEditingTask(null); } : undefined}
+          onClose={() => { setShowPanel(false); setEditingTask(null); }}
         />
       )}
     </div>
