@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Task } from './types';
 import { usePhysics } from './hooks/usePhysics';
-import { loadTasks, saveTasks } from './utils/storage';
+import { taskStore } from './utils/storage';
 import { randomColor, GOLD_COLOR } from './utils/colors';
 import {
   WORLD_WIDTH,
@@ -21,7 +21,7 @@ import './App.css';
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [positions, setPositions] = useState<Map<string, { x: number; y: number; angle: number }>>(new Map());
+  const [positions, setPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [longPressId, setLongPressId] = useState<string | null>(null);
   const [longPressProgress, setLongPressProgress] = useState(0);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -38,10 +38,10 @@ function App() {
 
   // Load tasks on mount
   useEffect(() => {
-    const saved = loadTasks();
+    const saved = taskStore.load();
     if (saved.length > 0) {
       setTasks(saved);
-      saved.forEach((t) => physics.addBlock(t));
+      saved.forEach((t: Task) => physics.addBlock(t));
     }
   }, []);
 
@@ -56,19 +56,20 @@ function App() {
     return () => cancelAnimationFrame(raf);
   }, [physics]);
 
+  // Save current positions to localStorage
+  const saveCurrentState = useCallback(() => {
+    const currentTasks = tasksRef.current;
+    if (currentTasks.length === 0) return;
+    const pos = physics.getBodyPositions();
+    taskStore.syncPositions(pos);
+  }, [physics]);
+
   // Auto-save when tasks change
   useEffect(() => {
-    if (tasks.length === 0 && loadTasks().length === 0) return;
-    const timeout = setTimeout(() => {
-      const pos = physics.getBodyPositions();
-      const updated = tasks.map((t) => {
-        const p = pos.get(t.id);
-        return p ? { ...t, x: p.x, y: p.y, angle: p.angle } : t;
-      });
-      saveTasks(updated);
-    }, 500);
+    if (tasks.length === 0) return;
+    const timeout = setTimeout(saveCurrentState, 500);
     return () => clearTimeout(timeout);
-  }, [tasks, physics]);
+  }, [tasks, saveCurrentState]);
 
   const totalHours = tasks.reduce((sum, t) => sum + t.hours, 0);
 
@@ -90,9 +91,9 @@ function App() {
         completed: false,
         x: stagingX(stagedCount),
         y: STAGING_SPAWN_Y - hoursToHeight(hours) / 2,
-        angle: 0,
       };
       physics.addBlock(task);
+      taskStore.add(task);
       setTasks((prev) => [...prev, task]);
     },
     [physics]
@@ -112,9 +113,9 @@ function App() {
           hours,
           x: pos?.x ?? existing.x,
           y: pos?.y ?? existing.y,
-          angle: 0,
         };
         physics.addBlock(updated);
+        taskStore.update(id, { title, hours, x: updated.x, y: updated.y });
         return prev.map((t) => (t.id === id ? updated : t));
       });
     },
@@ -124,6 +125,7 @@ function App() {
   const deleteTask = useCallback(
     (id: string) => {
       physics.removeBlock(id);
+      taskStore.remove(id);
       setTasks((prev) => prev.filter((t) => t.id !== id));
     },
     [physics]
@@ -132,6 +134,7 @@ function App() {
   const completeTask = useCallback(
     (id: string) => {
       physics.setStatic(id, true);
+      taskStore.update(id, { completed: true });
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? { ...t, completed: true } : t))
       );
@@ -142,6 +145,7 @@ function App() {
   const uncompleteTask = useCallback(
     (id: string) => {
       physics.setStatic(id, false);
+      taskStore.update(id, { completed: false });
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? { ...t, completed: false } : t))
       );
@@ -220,8 +224,13 @@ function App() {
 
   const handlePointerUp = () => {
     cancelLongPress();
+    const wasDragging = isDragging.current;
     physics.mouseUp();
     isDragging.current = false;
+    // Save positions after drag ends
+    if (wasDragging) {
+      setTimeout(saveCurrentState, 100);
+    }
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -298,7 +307,7 @@ function App() {
                     height: h,
                     left: pos.x - BLOCK_WIDTH / 2,
                     top: pos.y - h / 2,
-                    transform: `rotate(${pos.angle}rad)`,
+                    transform: 'none',
                     backgroundColor: task.completed ? GOLD_COLOR : task.color,
                   }}
                 >

@@ -1,25 +1,50 @@
-import type { DayData, Task } from '../types';
+import type { Task } from '../types';
 
-const STORAGE_KEY = 'tsumiki-todo-data';
+const STORAGE_KEY = 'tsumiki-todo-tasks';
 
-function todayKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-export function loadTasks(): Task[] {
+function readAll(): Task[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const data: DayData = JSON.parse(raw);
-    if (data.date !== todayKey()) return [];
-    return data.tasks;
+    return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-export function saveTasks(tasks: Task[]): void {
-  const data: DayData = { date: todayKey(), tasks };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+function writeAll(tasks: Task[]): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
 }
+
+export const taskStore = {
+  load(): Task[] {
+    return readAll();
+  },
+
+  add(task: Task): void {
+    const tasks = readAll();
+    tasks.push(task);
+    writeAll(tasks);
+  },
+
+  update(id: string, updates: Partial<Omit<Task, 'id'>>): void {
+    const tasks = readAll().map((t) => (t.id === id ? { ...t, ...updates } : t));
+    writeAll(tasks);
+  },
+
+  remove(id: string): void {
+    writeAll(readAll().filter((t) => t.id !== id));
+  },
+
+  /** Bulk-save positions from physics engine */
+  syncPositions(positions: Map<string, { x: number; y: number }>): void {
+    const tasks = readAll().map((t) => {
+      const p = positions.get(t.id);
+      return p ? { ...t, x: p.x, y: p.y } : t;
+    });
+    writeAll(tasks);
+  },
+
+  clear(): void {
+    localStorage.removeItem(STORAGE_KEY);
+  },
+};

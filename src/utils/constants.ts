@@ -1,10 +1,10 @@
-// Physics world dimensions
-export const WORLD_WIDTH = 600;
-export const WORLD_HEIGHT = 880;
+// Physics world — wider to accommodate left/right staging areas
+export const WORLD_WIDTH = 800;
+export const WORLD_HEIGHT = 760;
 
 // Block dimensions
 export const BLOCK_WIDTH = 180;
-export const PX_PER_HOUR = 40; // 1 hour = 40px height
+export const PX_PER_HOUR = 40;
 export const MIN_BLOCK_HEIGHT = 24;
 
 // 16-hour daily limit
@@ -14,24 +14,30 @@ export const MAX_HOURS = 16;
 export const GROUND_Y = WORLD_HEIGHT - 30;
 export const GROUND_THICKNESS = 60;
 
-// Limit line (16h worth of stacking from ground up)
+// Stacking area (center zone)
+export const STACKING_LEFT = 200;
+export const STACKING_RIGHT = 600;
+
+// Limit line
 export const LIMIT_LINE_Y = GROUND_Y - MAX_HOURS * PX_PER_HOUR;
 
-// Staging area at top — shelf where new blocks appear
-export const STAGING_SHELF_Y = LIMIT_LINE_Y - 10;
-export const STAGING_SPAWN_Y = STAGING_SHELF_Y - 30; // blocks spawn above shelf
+// Staging zones (left and right of stacking area)
+export const STAGING_LEFT_CENTER = 100;
+export const STAGING_RIGHT_CENTER = 700;
 
 // Wall thickness
 export const WALL_THICKNESS = 20;
+
+// Staging shelf (divides staging area from stacking area)
+export const STAGING_SHELF_Y = 120;
+export const STAGING_SPAWN_Y = 60;
 
 export function hoursToHeight(hours: number): number {
   return Math.max(hours * PX_PER_HOUR, MIN_BLOCK_HEIGHT);
 }
 
+/** Compute x position for new blocks in staging zones */
 export function stagingX(index: number): number {
-  // Position blocks in a row, wrapping if needed
-  const cols = 3;
-  const col = index % cols;
-  const gap = (WORLD_WIDTH - 40) / cols;
-  return 40 + gap / 2 + col * gap;
+  // Alternate left and right
+  return index % 2 === 0 ? STAGING_LEFT_CENTER : STAGING_RIGHT_CENTER;
 }

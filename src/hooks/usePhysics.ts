@@ -17,7 +17,7 @@ export interface PhysicsAPI {
   addBlock: (task: Task) => Matter.Body;
   removeBlock: (taskId: string) => void;
   setStatic: (taskId: string, isStatic: boolean) => void;
-  getBodyPositions: () => Map<string, { x: number; y: number; angle: number }>;
+  getBodyPositions: () => Map<string, { x: number; y: number }>;
   queryPoint: (x: number, y: number) => string | null;
   mouseDown: (x: number, y: number) => void;
   mouseMove: (x: number, y: number) => void;
@@ -100,7 +100,9 @@ export function usePhysics(): PhysicsAPI {
       chamfer: { radius: 6 },
       label: task.id,
       isStatic: task.completed,
-      angle: task.angle || 0,
+      angle: 0,
+      inertia: Infinity,
+      inverseInertia: 0,
     });
     Matter.Composite.add(engineRef.current.world, body);
     bodiesRef.current.set(task.id, body);
@@ -123,12 +125,11 @@ export function usePhysics(): PhysicsAPI {
   }, []);
 
   const getBodyPositions = useCallback(() => {
-    const positions = new Map<string, { x: number; y: number; angle: number }>();
+    const positions = new Map<string, { x: number; y: number }>();
     bodiesRef.current.forEach((body, id) => {
       positions.set(id, {
         x: body.position.x,
         y: body.position.y,
-        angle: body.angle,
       });
     });
     return positions;
