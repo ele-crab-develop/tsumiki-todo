@@ -193,6 +193,24 @@ body {
   color: var(--accent);
 }
 
+.reset-btn {
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-btn:hover {
+  background: rgba(255, 0, 0, 0.12);
+  color: #ff6b6b;
+  border-color: rgba(255, 0, 0, 0.2);
+}
+
 .instructions {
   padding: 12px;
   border-radius: var(--radius);

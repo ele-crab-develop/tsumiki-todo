@@ -129,6 +129,12 @@ function App() {
     [physics]
   );
 
+  const resetAll = useCallback(() => {
+    physics.removeAll();
+    taskStore.clear();
+    setTasks([]);
+  }, [physics]);
+
   // ---- Coordinate mapping ----
   // Uses worldRef (the actual world div), not the container.
   // getBoundingClientRect returns screen-space rect, so this handles any CSS scaling.
@@ -237,6 +243,9 @@ function App() {
               </div>
             ))}
           </div>
+          <button className="reset-btn" onClick={resetAll}>
+            リセット
+          </button>
           <div className="instructions">
             <p>ドラッグで積み木を移動</p>
             <p>長押しで完了/未完了を切替</p>

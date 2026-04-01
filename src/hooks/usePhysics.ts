@@ -14,6 +14,7 @@ import {
 export interface PhysicsAPI {
   addBlock: (task: Task) => void;
   removeBlock: (taskId: string) => void;
+  removeAll: () => void;
   setStatic: (taskId: string, isStatic: boolean) => void;
   getBodyPositions: () => Map<string, { x: number; y: number }>;
   queryPoint: (x: number, y: number) => string | null;
@@ -31,7 +32,9 @@ export function usePhysics(): PhysicsAPI {
 
   if (!engineRef.current) {
     const engine = Matter.Engine.create({
-      gravity: { x: 0, y: 1.2, scale: 0.001 },
+      gravity: { x: 0, y: 1, scale: 0.001 },
+      positionIterations: 12,
+      velocityIterations: 8,
     });
 
     const ground = Matter.Bodies.rectangle(
@@ -82,8 +85,9 @@ export function usePhysics(): PhysicsAPI {
     const body = Matter.Bodies.rectangle(task.x, task.y, BLOCK_WIDTH, h, {
       friction: 0.6,
       frictionStatic: 0.8,
-      restitution: 0.05,
-      density: 0.002,
+      frictionAir: 0.05,
+      restitution: 0.02,
+      density: 0.001,
       label: task.id,
       isStatic: task.completed,
       // No chamfer — keeps physics rect identical to visual rect for accurate hit detection
@@ -101,6 +105,13 @@ export function usePhysics(): PhysicsAPI {
       Matter.Composite.remove(engineRef.current.world, body);
       bodiesRef.current.delete(taskId);
     }
+  }, []);
+
+  const removeAll = useCallback(() => {
+    bodiesRef.current.forEach((body) => {
+      Matter.Composite.remove(engineRef.current.world, body);
+    });
+    bodiesRef.current.clear();
   }, []);
 
   const setStatic = useCallback((taskId: string, isStatic: boolean) => {
@@ -170,6 +181,7 @@ export function usePhysics(): PhysicsAPI {
   return {
     addBlock,
     removeBlock,
+    removeAll,
     setStatic,
     getBodyPositions,
     queryPoint,
