@@ -131,8 +131,17 @@ function App() {
 
   const resetAll = useCallback(() => {
     physics.removeAll();
-    taskStore.clear();
-    setTasks([]);
+    setTasks((prev) => {
+      const reset = prev.map((t, i) => ({
+        ...t,
+        completed: false,
+        x: stagingX(i),
+        y: GROUND_Y - hoursToHeight(t.hours) / 2 - 4,
+      }));
+      reset.forEach((t) => physics.addBlock(t));
+      reset.forEach((t) => taskStore.update(t.id, { completed: false, x: t.x, y: t.y }));
+      return reset;
+    });
   }, [physics]);
 
   // ---- Coordinate mapping ----
