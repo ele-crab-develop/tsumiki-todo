@@ -9,7 +9,10 @@ import {
   BLOCK_WIDTH,
   LIMIT_LINE_Y,
   GROUND_Y,
+  STAGING_SHELF_Y,
+  STAGING_SPAWN_Y,
   hoursToHeight,
+  stagingX,
   MAX_HOURS,
   PX_PER_HOUR,
 } from './utils/constants';
@@ -71,14 +74,22 @@ function App() {
 
   const addTask = useCallback(
     (title: string, hours: number) => {
+      // Count how many unplaced (non-completed, above shelf) blocks exist for positioning
+      const pos = physics.getBodyPositions();
+      const stagedCount = tasksRef.current.filter((t) => {
+        if (t.completed) return false;
+        const p = pos.get(t.id);
+        return p && p.y < LIMIT_LINE_Y;
+      }).length;
+
       const task: Task = {
         id: crypto.randomUUID(),
         title,
         hours,
         color: randomColor(),
         completed: false,
-        x: WORLD_WIDTH / 2 + (Math.random() - 0.5) * 100,
-        y: 60,
+        x: stagingX(stagedCount),
+        y: STAGING_SPAWN_Y - hoursToHeight(hours) / 2,
         angle: 0,
       };
       physics.addBlock(task);
@@ -150,15 +161,9 @@ function App() {
   };
 
   const findTaskAtPoint = (x: number, y: number): Task | undefined => {
-    const pos = physics.getBodyPositions();
-    return tasksRef.current.find((t) => {
-      const p = pos.get(t.id);
-      if (!p) return false;
-      const h = hoursToHeight(t.hours);
-      const hw = BLOCK_WIDTH / 2;
-      const hh = h / 2;
-      return x >= p.x - hw && x <= p.x + hw && y >= p.y - hh && y <= p.y + hh;
-    });
+    const hitId = physics.queryPoint(x, y);
+    if (!hitId) return undefined;
+    return tasksRef.current.find((t) => t.id === hitId);
   };
 
   const cancelLongPress = () => {
@@ -254,6 +259,14 @@ function App() {
           style={{ touchAction: 'none' }}
         >
           <div className="canvas-world" style={{ width: WORLD_WIDTH, height: WORLD_HEIGHT }}>
+            {/* Staging area label */}
+            <div className="staging-area" style={{ top: 0, height: STAGING_SHELF_Y }}>
+              <span className="staging-label">タスク置き場</span>
+            </div>
+
+            {/* Staging shelf line */}
+            <div className="shelf-line" style={{ top: STAGING_SHELF_Y }} />
+
             {/* Limit line */}
             <div className="limit-line" style={{ top: LIMIT_LINE_Y }}>
               <span className="limit-label">{MAX_HOURS}h limit</span>

@@ -8,6 +8,7 @@ import {
   GROUND_Y,
   GROUND_THICKNESS,
   WALL_THICKNESS,
+  STAGING_SHELF_Y,
   hoursToHeight,
 } from '../utils/constants';
 
@@ -17,6 +18,7 @@ export interface PhysicsAPI {
   removeBlock: (taskId: string) => void;
   setStatic: (taskId: string, isStatic: boolean) => void;
   getBodyPositions: () => Map<string, { x: number; y: number; angle: number }>;
+  queryPoint: (x: number, y: number) => string | null;
   mouseDown: (x: number, y: number) => void;
   mouseMove: (x: number, y: number) => void;
   mouseUp: () => void;
@@ -58,7 +60,16 @@ export function usePhysics(): PhysicsAPI {
       { isStatic: true, friction: 0.3, label: 'wall-right' }
     );
 
-    Matter.Composite.add(engine.world, [ground, leftWall, rightWall]);
+    // Staging shelf — thin platform at the top for new blocks
+    const shelf = Matter.Bodies.rectangle(
+      WORLD_WIDTH / 2,
+      STAGING_SHELF_Y,
+      WORLD_WIDTH - 40,
+      4,
+      { isStatic: true, friction: 0.9, restitution: 0, label: 'shelf' }
+    );
+
+    Matter.Composite.add(engine.world, [ground, leftWall, rightWall, shelf]);
     engineRef.current = engine;
   }
 
@@ -69,7 +80,7 @@ export function usePhysics(): PhysicsAPI {
     let lastTime = performance.now();
 
     const step = (time: number) => {
-      const delta = Math.min(time - lastTime, 32); // cap at ~30fps min
+      const delta = Math.min(time - lastTime, 32);
       lastTime = time;
       Matter.Engine.update(engine, delta);
       raf = requestAnimationFrame(step);
@@ -123,32 +134,48 @@ export function usePhysics(): PhysicsAPI {
     return positions;
   }, []);
 
+  // Accurate hit detection using matter.js vertex queries
+  const queryPoint = useCallback((x: number, y: number): string | null => {
+    const engine = engineRef.current;
+    const allBodies = Matter.Composite.allBodies(engine.world);
+    const hits = Matter.Query.point(allBodies, { x, y });
+    // Find the first hit that is a task block (not wall/ground/shelf)
+    for (const body of hits) {
+      const label = body.label ?? '';
+      if (label === 'ground' || label.startsWith('wall') || label === 'shelf') continue;
+      return label; // label is the task ID
+    }
+    return null;
+  }, []);
+
   const mouseDown = useCallback((x: number, y: number) => {
     const engine = engineRef.current;
-    const bodies = Matter.Composite.allBodies(engine.world);
-    const point = { x, y };
+    const allBodies = Matter.Composite.allBodies(engine.world);
+    const hits = Matter.Query.point(allBodies, { x, y });
 
-    for (const body of bodies) {
-      if (body.isStatic && body.label !== 'ground' && !body.label?.startsWith('wall')) {
-        // completed blocks can't be dragged
-        if (Matter.Bounds.contains(body.bounds, point)) {
-          return; // it's a completed (gold) block — skip
-        }
+    for (const body of hits) {
+      const label = body.label ?? '';
+      if (label === 'ground' || label.startsWith('wall') || label === 'shelf') continue;
+
+      // Don't drag completed (gold) blocks
+      if (body.isStatic && bodiesRef.current.has(label)) {
+        // Check if this is a completed block — caller handles this
+        // We skip all static task blocks here (completed ones can't be dragged)
+        return;
       }
-      if (!body.isStatic && Matter.Bounds.contains(body.bounds, point)) {
-        dragBodyRef.current = body;
-        const constraint = Matter.Constraint.create({
-          pointA: point,
-          bodyB: body,
-          pointB: { x: x - body.position.x, y: y - body.position.y },
-          stiffness: 0.7,
-          damping: 0.3,
-          length: 0,
-        });
-        mouseConstraintRef.current = constraint;
-        Matter.Composite.add(engine.world, constraint);
-        break;
-      }
+
+      dragBodyRef.current = body;
+      const constraint = Matter.Constraint.create({
+        pointA: { x, y },
+        bodyB: body,
+        pointB: { x: x - body.position.x, y: y - body.position.y },
+        stiffness: 0.7,
+        damping: 0.3,
+        length: 0,
+      });
+      mouseConstraintRef.current = constraint;
+      Matter.Composite.add(engine.world, constraint);
+      break;
     }
   }, []);
 
@@ -173,6 +200,7 @@ export function usePhysics(): PhysicsAPI {
     removeBlock,
     setStatic,
     getBodyPositions,
+    queryPoint,
     mouseDown,
     mouseMove,
     mouseUp,

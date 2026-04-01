@@ -119,6 +119,35 @@ body {
   /* Scale to fit viewport while preserving aspect ratio */
 }
 
+/* ===== Staging Area ===== */
+.staging-area {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: none;
+  z-index: 0;
+}
+
+.staging-label {
+  position: absolute;
+  left: 12px;
+  top: 8px;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.2);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.shelf-line {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  z-index: 1;
+}
+
 /* ===== Limit Line ===== */
 .limit-line {
   position: absolute;
